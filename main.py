@@ -73,6 +73,10 @@ class CardStack:
                 pyxel.blt(self.x, self.y, 0, 16 * 2, 16 * 4, 16, 16, COLKEY)
             pyxel.blt(self.x, self.y, 0, 16, 16 * 4, 16, 16, COLKEY)
 
+    def update(self):
+        for card in self.cards:
+            card.update()
+
     def addCard(self, card):
         card.x = self.x
         card.y = self.y + self.y_offset * len(self.cards)
@@ -82,41 +86,169 @@ class CardStack:
     def popCard(self):
         return self.cards.pop()
 
+    def isSelected(self):
+        if self.cards:
+            for card in self.cards:
+                if card.is_focus:
+                    return True
+            return False
+        else:
+            return self.is_focus
+
+    def unselect(self):
+        if self.cards:
+            for card in self.cards:
+                if card.is_focus:
+                    card.is_focus = False
+                    break
+        else:
+            self.is_focus = False
+
+    def select(self):
+        if self.cards:
+            self.cards[-1].is_focus = True
+        else:
+            self.is_focus = True
+
+    def getSelectedCard(self):
+        if not self.cards:
+            return None
+        for card in self.cards:
+            if card.is_focus:
+                return card
+
+    def getNextCard(self, card):
+        if not self.cards:
+            return None
+        if card not in self.cards:
+            return None
+        index = self.cards.index(card)
+        return self.cards[index + 1 - len(self.cards)]
+
+    def getPrevCard(self, card):
+        if not self.cards:
+            return None
+        if card not in self.cards:
+            return None
+        index = self.cards.index(card)
+        return self.cards[index - 1]
+
+    def hasCards(self):
+        return bool(self.cards)
+
+    def moveCardsFromStack(self, stack):
+        self.unselect()
+        stack.selectBottomCard()
+
+        temp_cards = []
+        while stack.hasCards():
+            card = stack.popCard()
+            temp_cards.append(card)
+
+        while temp_cards:
+            self.addCard(temp_cards.pop())
+
+    def popFromSelectedToStack(self, stack):
+        selected_card = self.getSelectedCard()
+
+        if selected_card is None:
+            return
+
+        if not selected_card.is_faced:
+            return
+
+        temp_cards = []
+
+        card = self.popCard()
+        temp_cards.append(card)
+        while card is not selected_card:
+            card = self.popCard()
+            temp_cards.append(card)
+
+        while temp_cards:
+            stack.addCard(temp_cards.pop())
+
+        stack.unselect()
+        self.selectTopCard()
+
+    def selectTopCard(self):
+        if self.cards:
+            self.cards[-1].is_focus = True
+        else:
+            self.is_focus = True
+
+    def selectBottomCard(self):
+        if self.cards:
+            self.cards[0].is_focus = True
+        else:
+            self.is_focus = True
+
+    def hasFacedCards(self):
+        if not self.hasCards():
+            return False
+
+        return self.cards[-1].is_faced
+
+    def openCard(self):
+        if not self.hasCards():
+            return
+
+        self.cards[-1].is_faced = True
+
 
 class CardDeck(CardStack):
     def __init__(self):
         super().__init__()
         self.y_offset = 0
 
+    def moveCardsFromStack(self, stack):
+        if len(stack.cards) != 1:
+            return
+        super().moveCardsFromStack(stack)
+
 
 class HandStack(CardStack):
+    def __init__(self):
+        super().__init__()
+        self.y_middle_offset = 5
+        self.from_stack = None
+
     def draw(self):
         if len(self.cards):
             for card in self.cards:
                 card.draw()
 
+    def addCard(self, card):
+        super().addCard(card)
+        if len(self.cards) <= 3:
+            return
+
+        for prev_card, cur_card in zip(self.cards[1:-1], self.cards[2:-1]):
+            cur_card.y = prev_card.y + self.y_middle_offset
+
+        self.cards[-1].y = self.cards[-2].y + self.y_offset
+
 
 class Game:
     def __init__(self):
-        self.left_decks = []
-        self.final_decks = []
+        self.left_deck = None
+        self.right_deck = None
 
+        self.final_decks = []
         self.card_stacks = []
+
         self.hand_stack = None
-        self.temp_stack = None
-        pass
 
     def run(self):
         pyxel.run(self.update, self.draw)
-        pass
 
     def initialize(self):
         pyxel.init(120, 180, caption="Pyxel Klondike")
-
         pyxel.load("assets/game.pyxres")
+        pyxel.mouse(True)
 
-        self.left_decks.append(setupCardStackPosition(CardDeck(), 0, 0))
-        self.left_decks.append(setupCardStackPosition(CardDeck(), 0, 1))
+        self.left_deck = setupCardStackPosition(CardDeck(), 0, 0)
+        self.right_deck = setupCardStackPosition(CardDeck(), 0, 1)
 
         self.final_decks.append(setupCardStackPosition(CardDeck(), 0, 3))
         self.final_decks.append(setupCardStackPosition(CardDeck(), 0, 4))
@@ -132,7 +264,6 @@ class Game:
         self.card_stacks.append(setupCardStackPosition(CardStack(), 1, 6))
 
         self.hand_stack = setupCardStackPosition(HandStack(), 5, 0)
-        self.temp_stack = HandStack()
 
         # init cards
         cards = []
@@ -140,40 +271,22 @@ class Game:
             for rank in range(13):
                 cards.append(self.createCard(rank, suit, False))
 
-        # here must be card shuffling
         random.shuffle(cards)
 
         # place cards to stacks
         for card in cards:
-            self.left_decks[0].addCard(card)
+            self.left_deck.addCard(card)
 
         counter = 1
         for card_stack in self.card_stacks:
             for i in range(counter):
-                card = self.left_decks[0].popCard()
+                card = self.left_deck.popCard()
                 card_stack.addCard(card)
                 if i == counter - 1:
                     card.is_faced = True
             counter += 1
 
-        for deck in self.final_decks:
-            card = self.left_decks[0].popCard()
-            card.is_faced = True
-            deck.addCard(card)
-
-        card = self.left_decks[0].popCard()
-        card.is_faced = True
-        self.left_decks[1].addCard(card)
-
-        # select card
         self.card_stacks[0].cards[-1].is_focus = True
-
-        self.card_stacks[4].cards[-2].is_faced = True
-        self.card_stacks[4].cards[-3].is_faced = True
-        self.card_stacks[4].cards[-4].is_faced = True
-
-        pyxel.mouse(True)
-        pass
 
     def createCard(self, rank, suit, is_faced=True):
         card = Card(rank, suit)
@@ -182,12 +295,9 @@ class Game:
         card.h = 16
         card.u = 16 * rank
         card.v = 16 * suit
-
         card.x = 0
         card.y = 0
-
         card.is_faced = is_faced
-
         return card
 
     def finalize(self):
@@ -207,205 +317,122 @@ class Game:
         elif pyxel.btnp(pyxel.KEY_ENTER):
             self.onEnter()
 
-        for card_stack in self.left_decks + self.card_stacks:
-            for card in card_stack.cards:
-                card.update()
+        for card_stack in self.getAllStacks():
+            card_stack.update()
 
-    def getUpSelectedCandidates(self):
-        candidates = []
-        for deck in self.left_decks + self.final_decks:
-            if deck.cards:
-                candidates.append(deck.cards[-1])
-        return candidates
+    def getAllCardStacks(self):
+        return [self.left_deck, self.right_deck] + self.final_decks + self.card_stacks
 
-    def getDownSelectedCandidates(self):
-        candidates = []
-        for card_stack in self.card_stacks:
-            if card_stack.cards:
-                candidates.append(card_stack.cards[-1])
-        return candidates
-
-    def getSelectCandidates(self):
-        return self.getUpSelectedCandidates() + self.getDownSelectedCandidates()
-
-    def hasUpSelected(self):
-        candidates = self.getUpSelectedCandidates()
-        for card in candidates:
-            if card.is_selected is True:
-                return True
-        return False
-
-    def hasDownSelected(self):
-        candidates = self.getDownSelectedCandidates()
-        for card in candidates:
-            if card.is_selected is True:
-                return True
-        return False
-
-    def hasSelected(self):
-        return self.hasUpSelected() is True or self.hasDownSelected() is True
+    def getAllStacks(self):
+        return [self.left_deck, self.right_deck] + self.card_stacks + self.final_decks + [self.hand_stack]
 
     def onMoveRight(self):
         print("right")
-        is_found = False
-        all_stacks = self.left_decks + self.final_decks + self.card_stacks
-        for card_stack in all_stacks:
-            if is_found is True:
-                if card_stack.cards:
-                    card_stack.cards[-1].is_focus = True
-                else:
-                    card_stack.is_focus = True
-                is_found = False
+        all_stacks = self.getAllCardStacks()
+        shifted_stacks = all_stacks[1:] + [all_stacks[0]]
+        for cur_stack, next_stack in zip(all_stacks, shifted_stacks):
+            if cur_stack.isSelected() is True:
+                cur_stack.unselect()
+                next_stack.select()
                 break
-            for card in card_stack.cards:
-                if card_stack.is_focus is True:
-                    is_found = True
-                    card_stack.is_focus = False
-                elif card.is_focus is True:
-                    is_found = True
-                    card.is_focus = False
-                    break
-        if is_found is True:
-            if all_stacks[0].cards:
-                all_stacks[0].cards[-1].is_focus = True
-            else:
-                all_stacks[0].is_focus = True
 
     def onMoveLeft(self):
         print("left")
-        is_found = False
-        all_stacks = self.left_decks + self.final_decks + self.card_stacks
-        for card_stack in reversed(all_stacks):
-            if is_found is True:
-                if card_stack.cards:
-                    card_stack.cards[-1].is_focus = True
-                else:
-                    card_stack.is_focus = True
-                is_found = False
+        all_stacks = self.getAllCardStacks()
+        shifted_stacks = [all_stacks[-1]] + all_stacks[0:-1]
+        for cur_stack, next_stack in zip(reversed(all_stacks), reversed(shifted_stacks)):
+            if cur_stack.isSelected() is True:
+                cur_stack.unselect()
+                next_stack.select()
                 break
-            for card in card_stack.cards:
-                if card_stack.is_focus is True:
-                    is_found = True
-                    card_stack.is_focus = False
-                elif card.is_focus is True:
-                    is_found = True
-                    card.is_focus = False
-                    break
-        if is_found is True:
-            if all_stacks[-1].cards:
-                all_stacks[-1].cards[-1].is_focus = True
-            else:
-                all_stacks[-1].is_focus = True
 
     def onMoveUp(self):
         print("up")
-        is_found = False
         focus_card_stack = None
+
         for card_stack in self.card_stacks:
-            for card in card_stack.cards:
-                if card.is_focus is True:
-                    focus_card_stack = card_stack
-                    break
-            if focus_card_stack is not None:
+            if card_stack.isSelected() is True:
+                focus_card_stack = card_stack
                 break
+
         if focus_card_stack is None:
             return
-        for card in reversed(focus_card_stack.cards):
-            if card.is_faced is False:
-                break
-            if is_found is True:
-                card.is_focus = True
-                is_found = False
-                break
-            if card.is_focus is True:
-                card.is_focus = False
-                is_found = True
-        if is_found is True:
-            focus_card_stack.cards[-1].is_focus = True
+
+        selected_card = focus_card_stack.getSelectedCard()
+        prev_card = focus_card_stack.getPrevCard(selected_card)
+
+        if prev_card is None:
+            return
+
+        if not prev_card.is_faced:
+            return
+
+        selected_card.is_focus = False
+        prev_card.is_focus = True
 
     def onMoveDown(self):
         print("down")
-        is_found = False
         focus_card_stack = None
+
         for card_stack in self.card_stacks:
-            for card in card_stack.cards:
-                if card.is_focus is True:
-                    focus_card_stack = card_stack
-                    break
-            if focus_card_stack is not None:
+            if card_stack.isSelected() is True:
+                focus_card_stack = card_stack
                 break
+
         if focus_card_stack is None:
             return
-        for card in focus_card_stack.cards:
-            if card.is_faced is False:
-                continue
-            if is_found is True:
-                card.is_focus = True
-                is_found = False
-                break
-            if card.is_focus is True:
-                card.is_focus = False
-                is_found = True
-        if is_found is True:
-            for card in focus_card_stack.cards:
-                if card.is_faced is True:
-                    card.is_focus = True
-                    break
+
+        selected_card = focus_card_stack.getSelectedCard()
+        next_card = focus_card_stack.getNextCard(selected_card)
+
+        if next_card is None:
+            return
+
+        if not next_card.is_faced:
+            return
+
+        selected_card.is_focus = False
+        next_card.is_focus = True
 
     def onEnter(self):
         print("enter")
-        all_stacks = self.left_decks + self.final_decks + self.card_stacks
-        if self.hand_stack.cards:
-            for card_stack in all_stacks:
-                is_found = False
-                for card in card_stack.cards:
-                    if card.is_faced is False:
-                        continue
-                    if card.is_focus is False:
-                        continue
+        all_stacks = self.getAllCardStacks()
 
-                    is_found = True
+        selected_card_stack = None
+        for card_stack in all_stacks:
+            if card_stack.isSelected():
+                selected_card_stack = card_stack
+                break
 
-                if is_found is True:
-                    while self.hand_stack.cards:
-                        self.temp_stack.addCard(self.hand_stack.popCard())
-                    while self.temp_stack.cards:
-                        card_stack.addCard(self.temp_stack.popCard())
-                    break
+        if self.hand_stack.hasCards():
+            if selected_card_stack not in [self.left_deck, self.right_deck] and selected_card_stack.hasFacedCards() or selected_card_stack is self.hand_stack.from_stack:
+                selected_card_stack.moveCardsFromStack(self.hand_stack)
+                self.hand_stack.from_stack = None
         else:
-            for card_stack in all_stacks:
-                start_card = None
-                for card in card_stack.cards:
-                    if card.is_faced is False:
-                        continue
-                    if card.is_focus is False:
-                        continue
-
-                    start_card = card
-                    break
-
-                if start_card is not None:
-                    card = card_stack.popCard()
-                    self.temp_stack.addCard(card)
-                    while card.is_focus is False:
-                        card = card_stack.popCard()
-                        self.temp_stack.addCard(card)
-                    card.is_focus = False
-
-                    while self.temp_stack.cards:
-                        self.hand_stack.addCard(self.temp_stack.popCard())
-
-                    if card_stack.cards:
-                        card_stack.cards[-1].is_focus = True
-                    else:
-                        card_stack.is_focus = True
-                    break
+            if selected_card_stack is self.left_deck:
+                if self.left_deck.hasCards():
+                    card = self.left_deck.popCard()
+                    card.is_faced = True
+                    self.right_deck.addCard(card)
+                else:
+                    while self.right_deck.hasCards():
+                        card = self.right_deck.popCard()
+                        card.is_faced = False
+                        self.left_deck.addCard(card)
+                self.right_deck.unselect()
+                self.left_deck.selectTopCard()
+            else:
+                if selected_card_stack.hasCards() and not selected_card_stack.hasFacedCards():
+                    selected_card_stack.openCard()
+                else:
+                    selected_card_stack.popFromSelectedToStack(self.hand_stack)
+                    self.hand_stack.from_stack = selected_card_stack
 
     def drawBackground(self):
         pyxel.cls(11)
 
     def drawCardStacks(self):
-        for card_stack in self.left_decks + self.card_stacks + self.final_decks + [self.hand_stack]:
+        for card_stack in self.getAllStacks():
             card_stack.draw()
 
     def draw(self):
