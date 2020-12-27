@@ -61,7 +61,8 @@ class CardStack:
         self.x = 0
         self.y = 0
 
-        self.y_offset = 11
+        self.y_faced_offset = 11
+        self.y_not_faced_offset = 5
         self.cards = []
         self.is_focus = False
 
@@ -82,7 +83,13 @@ class CardStack:
 
     def addCard(self, card):
         card.x = self.x
-        card.y = self.y + self.y_offset * len(self.cards)
+        card.y = self.y
+
+        if self.cards:
+            if card.is_faced:
+                card.y = self.cards[-1].y + self.y_faced_offset
+            else:
+                card.y = self.cards[-1].y + self.y_not_faced_offset
 
         self.cards.append(card)
 
@@ -233,7 +240,8 @@ class CardStack:
 class CardDeck(CardStack):
     def __init__(self):
         super().__init__()
-        self.y_offset = 0
+        self.y_faced_offset = 0
+        self.y_not_faced_offset = 0
 
     def moveCardsFromStack(self, stack):
         if len(stack.cards) != 1:
@@ -257,10 +265,10 @@ class HandStack(CardStack):
         if len(self.cards) <= 3:
             return
 
-        for cur_card, prev_card in zip(self.cards[2:-1], self.cards[1:-1]):
+        a = self.cards[2:]
+        b = self.cards[1:]
+        for cur_card, prev_card in zip(a, b):
             cur_card.y = prev_card.y + self.y_middle_offset
-
-        self.cards[-1].y = self.cards[-2].y + self.y_offset
 
 
 class Game:
