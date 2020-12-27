@@ -183,6 +183,15 @@ class CardStack:
         else:
             self.is_focus = True
 
+    def selectBottomFacedCard(self):
+        if self.cards:
+            for card in self.cards:
+                if card.is_faced is True:
+                    card.is_focus = True
+                    break
+        else:
+            self.is_focus = True
+
     def hasFacedCards(self):
         if not self.hasCards():
             return False
@@ -348,6 +357,18 @@ class Game:
 
     def onMoveUp(self):
         print("up")
+
+        # idea for cursor move to top decks from bottom stacks and vice versa:
+        # 1. add to each card stack unique id:
+        #   [1 ][2 ]____[3 ][4 ][5 ][6 ]
+        #   [7 ][8 ][9 ][10][11][12][13]
+        # 2. define vector of up and down transitions:
+        #   transitions = [
+        #       [7, 1], [8, 2], [9, 2], [10, 3], [11, 4], [12, 5], [13, 6],   # up
+        #       [1, 7], [2, 8], [3, 10], [4, 11], [5, 12], [6, 13]            # down
+        #   ]
+        # 3. when prev_card is None try to do transition according to
+
         focus_card_stack = None
 
         for card_stack in self.card_stacks:
@@ -358,17 +379,18 @@ class Game:
         if focus_card_stack is None:
             return
 
+        if not focus_card_stack.hasCards():
+            return
+
         selected_card = focus_card_stack.getSelectedCard()
         prev_card = focus_card_stack.getPrevCard(selected_card)
 
-        if prev_card is None:
-            return
-
-        if not prev_card.is_faced:
-            return
-
         selected_card.is_focus = False
-        prev_card.is_focus = True
+
+        if prev_card.is_faced:
+            prev_card.is_focus = True
+        else:
+            focus_card_stack.selectTopCard()
 
     def onMoveDown(self):
         print("down")
@@ -382,17 +404,18 @@ class Game:
         if focus_card_stack is None:
             return
 
+        if not focus_card_stack.hasCards():
+            return
+
         selected_card = focus_card_stack.getSelectedCard()
         next_card = focus_card_stack.getNextCard(selected_card)
 
-        if next_card is None:
-            return
-
-        if not next_card.is_faced:
-            return
-
         selected_card.is_focus = False
-        next_card.is_focus = True
+
+        if next_card.is_faced:
+            next_card.is_focus = True
+        else:
+            focus_card_stack.selectBottomFacedCard()
 
     def onEnter(self):
         print("enter")
@@ -405,9 +428,16 @@ class Game:
                 break
 
         if self.hand_stack.hasCards():
-            if selected_card_stack not in [self.left_deck, self.right_deck] and selected_card_stack.hasFacedCards() or selected_card_stack is self.hand_stack.from_stack:
-                selected_card_stack.moveCardsFromStack(self.hand_stack)
-                self.hand_stack.from_stack = None
+            if selected_card_stack is self.hand_stack.from_stack:
+                    selected_card_stack.moveCardsFromStack(self.hand_stack)
+                    self.hand_stack.from_stack = None
+            elif selected_card_stack not in [self.left_deck, self.right_deck]:
+                if selected_card_stack.hasFacedCards():
+                    selected_card_stack.moveCardsFromStack(self.hand_stack)
+                    self.hand_stack.from_stack = None
+                elif not selected_card_stack.hasCards():
+                    selected_card_stack.moveCardsFromStack(self.hand_stack)
+                    self.hand_stack.from_stack = None
         else:
             if selected_card_stack is self.left_deck:
                 if self.left_deck.hasCards():
