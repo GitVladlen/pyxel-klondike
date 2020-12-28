@@ -2,8 +2,11 @@ import pyxel
 import random
 
 # constants
+WINDOW_W = 120
+WINDOW_H = 180
 COLKEY = 0
 CARD_H = 16
+CHAR_W = 4
 
 
 def setupCardStack(card_stack, row, col, id):
@@ -247,7 +250,6 @@ class CardStack:
             return CARD_H
 
 
-
 class CardDeck(CardStack):
     def __init__(self):
         super().__init__()
@@ -310,14 +312,29 @@ class Game:
         self.up_transitions = [[7, 1], [8, 2], [9, 2], [10, 3], [11, 4], [12, 5], [13, 6]]
         self.down_transitions = [[1, 7], [2, 8], [3, 10], [4, 11], [5, 12], [6, 13]]
 
+        self.is_game_over = False
+        self.is_instructions_active = False
+
     def run(self):
         pyxel.run(self.update, self.draw)
 
     def initialize(self):
-        pyxel.init(120, 180, caption="Pyxel Klondike")
+        pyxel.init(WINDOW_W, WINDOW_H, caption="Pyxel Klondike", quit_key=pyxel.KEY_NONE)
         pyxel.load("assets/game.pyxres")
-        pyxel.mouse(True)
+        pyxel.mouse(False)
 
+        self.reset()
+
+    def reset(self):
+        # clear all
+        self.is_game_over = False
+        self.left_deck = None
+        self.right_deck = None
+        self.final_decks = []
+        self.card_stacks = []
+        self.hand_stack = []
+
+        # create all
         self.left_deck = setupCardStack(CardDeck(), 0, 0, 1)
         self.right_deck = setupCardStack(CardDeck(), 0, 1, 2)
 
@@ -377,6 +394,8 @@ class Game:
     def update(self):
         if pyxel.btnp(pyxel.KEY_Q):
             pyxel.quit()
+        elif pyxel.btnp(pyxel.KEY_ESCAPE):
+            self.onEscape()
         elif pyxel.btnp(pyxel.KEY_RIGHT):
             self.onMoveRight()
         elif pyxel.btnp(pyxel.KEY_LEFT):
@@ -387,6 +406,14 @@ class Game:
             self.onMoveDown()
         elif pyxel.btnp(pyxel.KEY_ENTER):
             self.onEnter()
+        elif pyxel.btnp(pyxel.KEY_SPACE):
+            self.onSpace()
+        elif pyxel.btnp(pyxel.KEY_N):  # N - new game
+            self.reset()
+        elif pyxel.btnp(pyxel.KEY_I):
+            self.is_instructions_active = not self.is_instructions_active
+        # elif pyxel.btnp(pyxel.KEY_G):  # G - game over debug cheat
+        #     self.is_game_over = True
 
         for card_stack in self.getAllStacks():
             card_stack.update()
@@ -420,18 +447,6 @@ class Game:
             if card_stack.id == card_stack_id:
                 return card_stack
         return None
-
-    def onMoveRight(self):
-        print("right")
-        all_stacks = self.getAllCardStacks()
-        shifted_stacks = all_stacks[1:] + [all_stacks[0]]
-        for cur_stack, next_stack in zip(all_stacks, shifted_stacks):
-            if cur_stack.isSelected() is True:
-                cur_stack.unselect()
-                next_stack.select()
-                break
-
-        self.updateHandStackPosition()
 
     def tryMakeUpSelectTransition(self, card_stack):
         to_id = self.getUpTransitionToId(card_stack.id)
@@ -479,8 +494,34 @@ class Game:
             else:
                 self.hand_stack.updatePositionBehindStack(focused_stack)
 
+    def isGameOver(self):
+        # check left, right and bottom stacks for emptyness
+        for card_stack in [self.left_deck, self.right_deck] + self.card_stacks:
+            if card_stack.hasCards():
+                return False
+
+        # TO DO
+
+        return True
+
+    def onMoveRight(self):
+        print("right")
+        if self.is_game_over:
+            return
+        all_stacks = self.getAllCardStacks()
+        shifted_stacks = all_stacks[1:] + [all_stacks[0]]
+        for cur_stack, next_stack in zip(all_stacks, shifted_stacks):
+            if cur_stack.isSelected() is True:
+                cur_stack.unselect()
+                next_stack.select()
+                break
+
+        self.updateHandStackPosition()
+
     def onMoveLeft(self):
         print("left")
+        if self.is_game_over:
+            return
         all_stacks = self.getAllCardStacks()
         shifted_stacks = [all_stacks[-1]] + all_stacks[0:-1]
         for cur_stack, next_stack in zip(reversed(all_stacks), reversed(shifted_stacks)):
@@ -493,6 +534,9 @@ class Game:
 
     def onMoveUp(self):
         print("up")
+
+        if self.is_game_over:
+            return
 
         # idea for cursor move to top decks from bottom stacks and vice versa:
         # 1. add to each card stack unique id:
@@ -540,6 +584,10 @@ class Game:
 
     def onMoveDown(self):
         print("down")
+
+        if self.is_game_over:
+            return
+
         focus_card_stack = None
 
         for card_stack in self.card_stacks:
@@ -575,48 +623,94 @@ class Game:
             else:
                 focus_card_stack.select()
 
-    def onEnter(self):
-        print("enter")
+    def getSelectedStack(self):
         all_stacks = self.getAllCardStacks()
 
-        selected_card_stack = None
         for card_stack in all_stacks:
             if card_stack.isSelected():
-                selected_card_stack = card_stack
-                break
+                return card_stack
+
+        return None
+
+    def holdCardsToHandStack(self):
+        selected_card_stack = self.getSelectedStack()
+
+        if selected_card_stack is None:
+            return
+
+        if selected_card_stack is self.hand_stack.from_stack:
+            selected_card_stack.moveCardsFromStack(self.hand_stack)
+            self.hand_stack.from_stack = None
+            # BACK CARDS TO FROM STACK
+        elif selected_card_stack not in [self.left_deck, self.right_deck]:
+            if selected_card_stack.hasFacedCards():
+                selected_card_stack.moveCardsFromStack(self.hand_stack)
+                self.hand_stack.from_stack = None
+                # DROP ON FACED CARDS
+            elif not selected_card_stack.hasCards():
+                selected_card_stack.moveCardsFromStack(self.hand_stack)
+                self.hand_stack.from_stack = None
+                # DROP ON EMPTY STACK
+        if not self.hand_stack.hasCards():
+            if self.isGameOver():
+                self.is_game_over = True
+
+    def placeCardsFromHandStack(self):
+        selected_card_stack = self.getSelectedStack()
+
+        if selected_card_stack is None:
+            return
+
+        if selected_card_stack is self.left_deck:
+            if self.left_deck.hasCards():
+                card = self.left_deck.popCard()
+                card.is_faced = True
+                self.right_deck.addCard(card)
+            else:
+                while self.right_deck.hasCards():
+                    card = self.right_deck.popCard()
+                    card.is_faced = False
+                    self.left_deck.addCard(card)
+            self.right_deck.unselect()
+            self.left_deck.selectTopCard()
+        else:
+            if selected_card_stack.hasCards() and not selected_card_stack.hasFacedCards():
+                selected_card_stack.openCard()
+            else:
+                selected_card_stack.popFromSelectedToStack(self.hand_stack)
+                self.hand_stack.from_stack = selected_card_stack
+
+        self.updateHandStackPosition()
+
+    def onEnter(self):
+        print("enter")
+        if self.is_game_over:
+            return
 
         if self.hand_stack.hasCards():
-            if selected_card_stack is self.hand_stack.from_stack:
-                    selected_card_stack.moveCardsFromStack(self.hand_stack)
-                    self.hand_stack.from_stack = None
-            elif selected_card_stack not in [self.left_deck, self.right_deck]:
-                if selected_card_stack.hasFacedCards():
-                    selected_card_stack.moveCardsFromStack(self.hand_stack)
-                    self.hand_stack.from_stack = None
-                elif not selected_card_stack.hasCards():
-                    selected_card_stack.moveCardsFromStack(self.hand_stack)
-                    self.hand_stack.from_stack = None
+            self.holdCardsToHandStack()
         else:
-            if selected_card_stack is self.left_deck:
-                if self.left_deck.hasCards():
-                    card = self.left_deck.popCard()
-                    card.is_faced = True
-                    self.right_deck.addCard(card)
-                else:
-                    while self.right_deck.hasCards():
-                        card = self.right_deck.popCard()
-                        card.is_faced = False
-                        self.left_deck.addCard(card)
-                self.right_deck.unselect()
-                self.left_deck.selectTopCard()
-            else:
-                if selected_card_stack.hasCards() and not selected_card_stack.hasFacedCards():
-                    selected_card_stack.openCard()
-                else:
-                    selected_card_stack.popFromSelectedToStack(self.hand_stack)
-                    self.hand_stack.from_stack = selected_card_stack
+            self.placeCardsFromHandStack()
 
-            self.updateHandStackPosition()
+    def onSpace(self):
+        print("space")
+        if self.is_game_over:
+            return
+
+        if self.hand_stack.hasCards():
+            self.holdCardsToHandStack()
+        else:
+            self.placeCardsFromHandStack()
+
+    def onEscape(self):
+        print("escape")
+        if self.is_game_over:
+            return
+        if self.hand_stack.from_stack is None:
+            return
+
+        self.hand_stack.from_stack.moveCardsFromStack(self.hand_stack)
+        self.hand_stack.from_stack = None
 
     def drawBackground(self):
         pyxel.cls(11)
@@ -625,9 +719,95 @@ class Game:
         for card_stack in self.getAllStacks():
             card_stack.draw()
 
+    def drawInstructions(self):
+        x, y = self.calcScreenCenterPosition()
+        msg = """
+          RULES
+          - + -
+
+To win Klondike Solitaire 
+you must move all the cards
+to the four goals. Each
+foundation can only hold
+one suit and you must put
+the cards sequencing from
+Ace to King: Ace, 2, 3, 4,
+5, 6, 7, 8, 9, Jack, Queen
+and King. You have to
+complete all suits to win
+the game: clubs, diamonds,
+hearts and spades. 
+
+   <I> - SHOW CONTROLLS"""
+        half_msg_width = self.calcTextWidth(msg) // 2
+        pyxel.text(x - half_msg_width, y - 25, msg, 3)
+
+    def drawCotrollsInfo(self):
+        x, y = self.calcScreenCenterPosition()
+        msg = """       CONTROLLS
+       - - + - -
+
+    ARROWS - MOVE
+   <ENTER> - HOLD/PLACE
+   <SPACE> - HOLD/PLACE
+       <N> - NEW GAME
+     <ESC> - DROP
+       <I> - GAME RULES
+       <Q> - EXIT"""
+        half_msg_width = self.calcTextWidth(msg) // 2
+        pyxel.text(x - half_msg_width, y + 10, msg, 3)
+
+    def calcTextWidth(self, msg):
+        lens = []
+        cur_len = 0
+        for char in msg:
+            if char == '\n':
+                lens.append(cur_len)
+                cur_len = 0
+            else:
+                cur_len += 1
+        if lens:
+            max_len = max(lens)
+        else:
+            max_len = cur_len
+        return max_len * CHAR_W
+
+    def calcScreenCenterPosition(self):
+        x = WINDOW_W // 2
+        y = WINDOW_H // 2
+        return x, y
+
+    def drawGaveOver(self):
+        x, y = self.calcScreenCenterPosition()
+        msg = "G A M E   O V E R"
+        half_msg_width = self.calcTextWidth(msg) // 2
+
+        COL_1 = 1
+        COL_2 = 15
+
+        pyxel.text(x - half_msg_width + 1, y, msg, COL_1)
+        pyxel.text(x - half_msg_width, y + 1, msg, COL_1)
+        pyxel.text(x - half_msg_width - 1, y, msg, COL_1)
+        pyxel.text(x - half_msg_width, y - 1, msg, COL_1)
+
+        pyxel.text(x - half_msg_width - 1, y - 1, msg, COL_1)
+        pyxel.text(x - half_msg_width - 1, y + 1, msg, COL_1)
+        pyxel.text(x - half_msg_width + 1, y + 1, msg, COL_1)
+        pyxel.text(x - half_msg_width + 1, y - 1, msg, COL_1)
+
+        pyxel.text(x - half_msg_width, y, msg, COL_2)
+
     def draw(self):
         self.drawBackground()
+        if self.is_instructions_active:
+            self.drawInstructions()
+        else:
+            self.drawCotrollsInfo()
+
         self.drawCardStacks()
+
+        if self.is_game_over:
+            self.drawGaveOver()
 
         # debug
         # self.__drawDebug(1, 130)
