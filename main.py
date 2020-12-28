@@ -638,29 +638,6 @@ class Game:
         if selected_card_stack is None:
             return
 
-        if selected_card_stack is self.hand_stack.from_stack:
-            selected_card_stack.moveCardsFromStack(self.hand_stack)
-            self.hand_stack.from_stack = None
-            # BACK CARDS TO FROM STACK
-        elif selected_card_stack not in [self.left_deck, self.right_deck]:
-            if selected_card_stack.hasFacedCards():
-                selected_card_stack.moveCardsFromStack(self.hand_stack)
-                self.hand_stack.from_stack = None
-                # DROP ON FACED CARDS
-            elif not selected_card_stack.hasCards():
-                selected_card_stack.moveCardsFromStack(self.hand_stack)
-                self.hand_stack.from_stack = None
-                # DROP ON EMPTY STACK
-        if not self.hand_stack.hasCards():
-            if self.isGameOver():
-                self.is_game_over = True
-
-    def placeCardsFromHandStack(self):
-        selected_card_stack = self.getSelectedStack()
-
-        if selected_card_stack is None:
-            return
-
         if selected_card_stack is self.left_deck:
             if self.left_deck.hasCards():
                 card = self.left_deck.popCard()
@@ -682,15 +659,40 @@ class Game:
 
         self.updateHandStackPosition()
 
+    def placeCardsFromHandStack(self):
+        selected_card_stack = self.getSelectedStack()
+
+        if selected_card_stack is None:
+            return
+
+        if selected_card_stack is self.hand_stack.from_stack:
+            selected_card_stack.moveCardsFromStack(self.hand_stack)
+            self.hand_stack.from_stack = None
+            # BACK CARDS TO FROM STACK
+        elif selected_card_stack not in [self.left_deck, self.right_deck]:
+            if selected_card_stack.hasFacedCards():
+                selected_card_stack.moveCardsFromStack(self.hand_stack)
+                self.hand_stack.from_stack = None
+                # DROP ON FACED CARDS
+                # TODO: implement this
+            elif not selected_card_stack.hasCards():
+                selected_card_stack.moveCardsFromStack(self.hand_stack)
+                self.hand_stack.from_stack = None
+                # DROP ON EMPTY STACK
+                # TODO: implement this
+        if not self.hand_stack.hasCards():
+            if self.isGameOver():
+                self.is_game_over = True
+
     def onEnter(self):
         print("enter")
         if self.is_game_over:
             return
 
         if self.hand_stack.hasCards():
-            self.holdCardsToHandStack()
-        else:
             self.placeCardsFromHandStack()
+        else:
+            self.holdCardsToHandStack()
 
     def onSpace(self):
         print("space")
