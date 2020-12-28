@@ -748,13 +748,15 @@ hearts and spades.
         x, y = self.calcScreenCenterPosition()
         msg = """       CONTROLLS
        - - + - -
-
+ 
     ARROWS - MOVE
    <ENTER> - HOLD/PLACE
    <SPACE> - HOLD/PLACE
-       <N> - NEW GAME
      <ESC> - DROP
-       <I> - GAME RULES
+     
+       <N> - NEW GAME
+       <I> - GAME  (!)
+             RULES
        <Q> - EXIT"""
         half_msg_width = self.calcTextWidth(msg) // 2
         pyxel.text(x - half_msg_width, y + 10, msg, 3)
