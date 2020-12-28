@@ -412,8 +412,8 @@ class Game:
             self.reset()
         elif pyxel.btnp(pyxel.KEY_I):
             self.is_instructions_active = not self.is_instructions_active
-        # elif pyxel.btnp(pyxel.KEY_G):  # G - game over debug cheat
-        #     self.is_game_over = True
+        elif pyxel.btnp(pyxel.KEY_G):  # G - game over debug cheat
+            self.is_game_over = True
 
         for card_stack in self.getAllStacks():
             card_stack.update()
@@ -724,8 +724,8 @@ class Game:
     def drawInstructions(self):
         x, y = self.calcScreenCenterPosition()
         msg = """
-          RULES
-          - + -
+           RULES
+           - + -
 
 To win Klondike Solitaire 
 you must move all the cards
@@ -742,7 +742,7 @@ hearts and spades.
 
    <I> - SHOW CONTROLLS"""
         half_msg_width = self.calcTextWidth(msg) // 2
-        pyxel.text(x - half_msg_width, y - 25, msg, 3)
+        pyxel.text(x - half_msg_width, y - 24, msg, 3)
 
     def drawCotrollsInfo(self):
         x, y = self.calcScreenCenterPosition()
@@ -789,17 +789,17 @@ hearts and spades.
         COL_1 = 1
         COL_2 = 15
 
-        pyxel.text(x - half_msg_width + 1, y, msg, COL_1)
-        pyxel.text(x - half_msg_width, y + 1, msg, COL_1)
-        pyxel.text(x - half_msg_width - 1, y, msg, COL_1)
-        pyxel.text(x - half_msg_width, y - 1, msg, COL_1)
+        pyxel.text(x - half_msg_width + 1, y- 7, msg, COL_1)
+        pyxel.text(x - half_msg_width, y + 1- 7, msg, COL_1)
+        pyxel.text(x - half_msg_width - 1, y- 7, msg, COL_1)
+        pyxel.text(x - half_msg_width, y - 1- 7, msg, COL_1)
 
-        pyxel.text(x - half_msg_width - 1, y - 1, msg, COL_1)
-        pyxel.text(x - half_msg_width - 1, y + 1, msg, COL_1)
-        pyxel.text(x - half_msg_width + 1, y + 1, msg, COL_1)
-        pyxel.text(x - half_msg_width + 1, y - 1, msg, COL_1)
+        pyxel.text(x - half_msg_width - 1, y - 1- 7, msg, COL_1)
+        pyxel.text(x - half_msg_width - 1, y + 1- 7, msg, COL_1)
+        pyxel.text(x - half_msg_width + 1, y + 1- 7, msg, COL_1)
+        pyxel.text(x - half_msg_width + 1, y - 1- 7, msg, COL_1)
 
-        pyxel.text(x - half_msg_width, y, msg, COL_2)
+        pyxel.text(x - half_msg_width, y- 7, msg, COL_2)
 
     def draw(self):
         self.drawBackground()
