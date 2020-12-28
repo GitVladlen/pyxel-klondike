@@ -86,7 +86,7 @@ class CardStack:
         card.y = self.y
 
         if self.cards:
-            if card.is_faced:
+            if card.is_faced and self.cards[-1].is_faced:
                 card.y = self.cards[-1].y + self.y_faced_offset
             else:
                 card.y = self.cards[-1].y + self.y_not_faced_offset
@@ -281,10 +281,8 @@ class Game:
 
         self.hand_stack = None
 
-        self.transitions = [
-            [7, 1], [8, 2], [9, 2], [10, 3], [11, 4], [12, 5], [13, 6],   # up
-            [1, 7], [2, 8], [3, 10], [4, 11], [5, 12], [6, 13]            # down
-        ]
+        self.up_transitions = [[7, 1], [8, 2], [9, 2], [10, 3], [11, 4], [12, 5], [13, 6]]
+        self.down_transitions = [[1, 7], [2, 8], [3, 10], [4, 11], [5, 12], [6, 13]]
 
     def run(self):
         pyxel.run(self.update, self.draw)
@@ -328,9 +326,9 @@ class Game:
         for card_stack in self.card_stacks:
             for i in range(counter):
                 card = self.left_deck.popCard()
-                card_stack.addCard(card)
                 if i == counter - 1:
                     card.is_faced = True
+                card_stack.addCard(card)
             counter += 1
 
         self.card_stacks[0].cards[-1].is_focus = True
@@ -373,8 +371,14 @@ class Game:
     def getAllStacks(self):
         return [self.left_deck, self.right_deck] + self.card_stacks + self.final_decks + [self.hand_stack]
 
-    def getTransitionToId(self, card_stack_id):
-        for from_id, to_id in self.transitions:
+    def getUpTransitionToId(self, card_stack_id):
+        for from_id, to_id in self.up_transitions:
+            if card_stack_id == from_id:
+                return to_id
+        return None
+
+    def getDownTransitionToId(self, card_stack_id):
+        for from_id, to_id in self.down_transitions:
             if card_stack_id == from_id:
                 return to_id
         return None
@@ -384,6 +388,12 @@ class Game:
             if card_stack.id == card_stack_id:
                 card_stack.select()
                 break
+
+    def getCardStackById(self, card_stack_id):
+        for card_stack in self.getAllStacks():
+            if card_stack.id == card_stack_id:
+                return card_stack
+        return None
 
     def onMoveRight(self):
         print("right")
@@ -395,14 +405,28 @@ class Game:
                 next_stack.select()
                 break
 
-    def tryMakeSelectTransition(self, card_stack):
-        to_id = self.getTransitionToId(card_stack.id)
+    def tryMakeUpSelectTransition(self, card_stack):
+        to_id = self.getUpTransitionToId(card_stack.id)
 
         if to_id is None:
             return False
 
         card_stack.unselect()
         self.selectCardStackById(to_id)
+        return True
+
+    def tryMakeDownSelectTransition(self, card_stack):
+        to_id = self.getDownTransitionToId(card_stack.id)
+
+        if to_id is None:
+            return False
+
+        card_stack.unselect()
+        to_stack = self.getCardStackById(to_id)
+        if to_stack.hasFacedCards():
+            to_stack.selectBottomFacedCard()
+        else:
+            to_stack.select()
         return True
 
     def onMoveLeft(self):
@@ -441,16 +465,16 @@ class Game:
                 if card_stack.isSelected() is True:
                     focus_card_stack = card_stack
             if focus_card_stack:
-                self.tryMakeSelectTransition(focus_card_stack)
+                self.tryMakeUpSelectTransition(focus_card_stack)
             return
 
         if not focus_card_stack.hasCards():
-            self.tryMakeSelectTransition(focus_card_stack)
+            self.tryMakeUpSelectTransition(focus_card_stack)
             return
 
         selected_card = focus_card_stack.getSelectedCard()
 
-        if (selected_card.is_faced is False or focus_card_stack.isBottomFacedCard(selected_card)) and self.tryMakeSelectTransition(focus_card_stack):
+        if (selected_card.is_faced is False or focus_card_stack.isBottomFacedCard(selected_card)) and self.tryMakeUpSelectTransition(focus_card_stack):
             return
 
         prev_card = focus_card_stack.getPrevCard(selected_card)
@@ -476,7 +500,7 @@ class Game:
                 if card_stack.isSelected() is True:
                     focus_card_stack = card_stack
             if focus_card_stack:
-                self.tryMakeSelectTransition(focus_card_stack)
+                self.tryMakeDownSelectTransition(focus_card_stack)
             return
 
         if not focus_card_stack.hasCards():
@@ -484,7 +508,7 @@ class Game:
 
         selected_card = focus_card_stack.getSelectedCard()
 
-        if (selected_card.is_faced is False or focus_card_stack.isTopCard(selected_card)) and self.tryMakeSelectTransition(focus_card_stack):
+        if (selected_card.is_faced is False or focus_card_stack.isTopCard(selected_card)) and self.tryMakeDownSelectTransition(focus_card_stack):
             return
 
         next_card = focus_card_stack.getNextCard(selected_card)
