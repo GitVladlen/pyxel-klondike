@@ -321,7 +321,7 @@ class Game:
     def initialize(self):
         pyxel.init(WINDOW_W, WINDOW_H, caption="Pyxel Klondike", quit_key=pyxel.KEY_NONE)
         pyxel.load("assets/game.pyxres")
-        pyxel.mouse(False)
+        pyxel.mouse(True)
 
         self.reset()
 
@@ -700,9 +700,9 @@ class Game:
             return
 
         if self.hand_stack.hasCards():
-            self.holdCardsToHandStack()
-        else:
             self.placeCardsFromHandStack()
+        else:
+            self.holdCardsToHandStack()
 
     def onEscape(self):
         print("escape")
@@ -746,12 +746,12 @@ hearts and spades.
 
     def drawCotrollsInfo(self):
         x, y = self.calcScreenCenterPosition()
-        msg = """       CONTROLLS
-       - - + - -
+        msg = """   KEYBOARD CONTROLLS
+   - - - - + - - - - 
  
     ARROWS - MOVE
-   <ENTER> - HOLD/PLACE
    <SPACE> - HOLD/PLACE
+   <ENTER> - HOLD/PLACE
      <ESC> - DROP
      
        <N> - NEW GAME
@@ -759,7 +759,7 @@ hearts and spades.
              RULES
        <Q> - EXIT"""
         half_msg_width = self.calcTextWidth(msg) // 2
-        pyxel.text(x - half_msg_width, y + 10, msg, 3)
+        pyxel.text(x - half_msg_width, y, msg, 3)
 
     def calcTextWidth(self, msg):
         lens = []
