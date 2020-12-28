@@ -3,6 +3,7 @@ import random
 
 # constants
 COLKEY = 0
+CARD_H = 16
 
 
 def setupCardStack(card_stack, row, col, id):
@@ -54,6 +55,9 @@ class Card(Node):
 
         if self.is_focus is True:
             pyxel.blt(self.x, self.y, 0, 16 * 2, 16 * 4, 16, 16, COLKEY)
+
+    def getHeight(self):
+        return self.h
 
 
 class CardStack:
@@ -236,6 +240,13 @@ class CardStack:
 
         self.cards[-1].is_faced = True
 
+    def calcHeight(self):
+        if self.cards:
+            return self.cards[-1].y + CARD_H - self.y
+        else:
+            return CARD_H
+
+
 
 class CardDeck(CardStack):
     def __init__(self):
@@ -255,6 +266,8 @@ class HandStack(CardStack):
         self.y_middle_offset = 5
         self.from_stack = None
 
+        self.y_select_offset = 5
+
     def draw(self):
         if len(self.cards):
             for card in self.cards:
@@ -269,6 +282,19 @@ class HandStack(CardStack):
         b = self.cards[1:]
         for cur_card, prev_card in zip(a, b):
             cur_card.y = prev_card.y + self.y_middle_offset
+
+    def updatePositionBehindStack(self, card_stack):
+        self.x = card_stack.x
+        self.y = card_stack.y + card_stack.calcHeight() + self.y_select_offset
+
+        temp_cards = []
+        while self.cards:
+            card = self.popCard()
+            temp_cards.append(card)
+
+        while temp_cards:
+            card = temp_cards.pop()
+            self.addCard(card)
 
 
 class Game:
@@ -405,6 +431,8 @@ class Game:
                 next_stack.select()
                 break
 
+        self.updateHandStackPosition()
+
     def tryMakeUpSelectTransition(self, card_stack):
         to_id = self.getUpTransitionToId(card_stack.id)
 
@@ -429,6 +457,28 @@ class Game:
             to_stack.select()
         return True
 
+    def updateHandStackPosition(self):
+        if self.hand_stack.hasCards():
+            focused_stack = None
+            for card_stack in self.getAllCardStacks():
+                if card_stack.isSelected():
+                    focused_stack = card_stack
+                    break
+            if focused_stack is None:
+                return
+            if focused_stack in [self.left_deck, self.right_deck] + self.final_decks:
+                to_stack = None
+                for from_id, to_id in self.down_transitions:
+                    if focused_stack.id == from_id:
+                        to_stack = self.getCardStackById(to_id)
+                        break
+                if to_stack is not None:
+                    self.hand_stack.updatePositionBehindStack(to_stack)
+                else:
+                    self.hand_stack.updatePositionBehindStack(focused_stack)
+            else:
+                self.hand_stack.updatePositionBehindStack(focused_stack)
+
     def onMoveLeft(self):
         print("left")
         all_stacks = self.getAllCardStacks()
@@ -438,6 +488,8 @@ class Game:
                 cur_stack.unselect()
                 next_stack.select()
                 break
+
+        self.updateHandStackPosition()
 
     def onMoveUp(self):
         print("up")
@@ -518,7 +570,10 @@ class Game:
         if next_card.is_faced:
             next_card.is_focus = True
         else:
-            focus_card_stack.selectBottomFacedCard()
+            if focus_card_stack.hasFacedCards():
+                focus_card_stack.selectBottomFacedCard()
+            else:
+                focus_card_stack.select()
 
     def onEnter(self):
         print("enter")
@@ -560,6 +615,8 @@ class Game:
                 else:
                     selected_card_stack.popFromSelectedToStack(self.hand_stack)
                     self.hand_stack.from_stack = selected_card_stack
+
+            self.updateHandStackPosition()
 
     def drawBackground(self):
         pyxel.cls(11)
