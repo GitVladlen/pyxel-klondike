@@ -321,7 +321,7 @@ class Game:
     def initialize(self):
         pyxel.init(WINDOW_W, WINDOW_H, caption="Pyxel Klondike", quit_key=pyxel.KEY_NONE)
         pyxel.load("assets/game.pyxres")
-        pyxel.mouse(True)
+        pyxel.mouse(False)
 
         self.reset()
 
