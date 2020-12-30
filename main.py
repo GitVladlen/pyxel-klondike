@@ -354,6 +354,13 @@ class Game:
         self.hand_stack = setupCardStack(HandStack(), 5, 0, 14)
 
         # init cards
+
+        # Suits (total 4):
+        # 0 - clubs, 1 - diamonds, 2 - hearts, 3 - spades
+        # Ranks (total 13):
+        # 0 - Ace, 1 - 2, 2 - 3, 3 - 4, 4 - 5, 5 - 6, 6 - 7, 7 - 8, 8 - 9, 9 - 10, 10 - Jack, 11 - Queen, 12 - King
+        # total cards in deck 52
+
         cards = []
         for suit in range(4):
             for rank in range(13):
@@ -632,6 +639,37 @@ class Game:
 
         return None
 
+    def checkPlaceFromHandToNotEmptyStack(self, stack):
+        hand_stack_card = self.hand_stack.cards[0]
+        card_stack_card = stack.cards[-1]
+
+        if stack in self.card_stacks:
+            if hand_stack_card.rank != card_stack_card.rank - 1:
+                return False
+
+            if (hand_stack_card.suit == 0 or hand_stack_card.suit == 3) and\
+                    (card_stack_card.suit == 1 or card_stack_card.suit == 2):
+                return True
+            elif (hand_stack_card.suit == 1 or hand_stack_card.suit == 2) and\
+                    (card_stack_card.suit == 0 or card_stack_card.suit == 3):
+                return True
+        elif stack in self.final_decks:
+            if hand_stack_card.rank != card_stack_card.rank + 1:
+                return False
+
+            if hand_stack_card.suit == card_stack_card.suit:
+                return True
+        return False
+
+    def checkPlaceFromHandToEmptyStack(self, stack):
+        if stack in self.card_stacks:
+            if self.hand_stack.cards[0].rank == 12:  # King
+                return True
+        elif stack in self.final_decks:
+            if self.hand_stack.cards[0].rank == 0:  # Ace
+                return True
+        return False
+
     def holdCardsToHandStack(self):
         selected_card_stack = self.getSelectedStack()
 
@@ -671,15 +709,15 @@ class Game:
             # BACK CARDS TO FROM STACK
         elif selected_card_stack not in [self.left_deck, self.right_deck]:
             if selected_card_stack.hasFacedCards():
-                selected_card_stack.moveCardsFromStack(self.hand_stack)
-                self.hand_stack.from_stack = None
                 # DROP ON FACED CARDS
-                # TODO: implement this
+                if self.checkPlaceFromHandToNotEmptyStack(selected_card_stack):
+                    selected_card_stack.moveCardsFromStack(self.hand_stack)
+                    self.hand_stack.from_stack = None
             elif not selected_card_stack.hasCards():
-                selected_card_stack.moveCardsFromStack(self.hand_stack)
-                self.hand_stack.from_stack = None
                 # DROP ON EMPTY STACK
-                # TODO: implement this
+                if self.checkPlaceFromHandToEmptyStack(selected_card_stack):
+                    selected_card_stack.moveCardsFromStack(self.hand_stack)
+                    self.hand_stack.from_stack = None
         if not self.hand_stack.hasCards():
             if self.isGameOver():
                 self.is_game_over = True
