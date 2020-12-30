@@ -746,8 +746,12 @@ class Game:
         print("escape")
         if self.is_game_over:
             return
+
         if self.hand_stack.from_stack is None:
             return
+
+        selected_card_stack = self.getSelectedStack()
+        selected_card_stack.unselect()
 
         self.hand_stack.from_stack.moveCardsFromStack(self.hand_stack)
         self.hand_stack.from_stack = None
