@@ -512,7 +512,7 @@ class Game:
         return True
 
     def onMoveRight(self):
-        print("right")
+        # print("right")
         if self.is_game_over:
             return
         all_stacks = self.getAllCardStacks()
@@ -526,7 +526,7 @@ class Game:
         self.updateHandStackPosition()
 
     def onMoveLeft(self):
-        print("left")
+        # print("left")
         if self.is_game_over:
             return
         all_stacks = self.getAllCardStacks()
@@ -540,7 +540,7 @@ class Game:
         self.updateHandStackPosition()
 
     def onMoveUp(self):
-        print("up")
+        # print("up")
 
         if self.is_game_over:
             return
@@ -590,7 +590,7 @@ class Game:
             focus_card_stack.selectTopCard()
 
     def onMoveDown(self):
-        print("down")
+        # print("down")
 
         if self.is_game_over:
             return
@@ -723,7 +723,7 @@ class Game:
                 self.is_game_over = True
 
     def onEnter(self):
-        print("enter")
+        # print("enter")
         if self.is_game_over:
             return
 
@@ -733,7 +733,7 @@ class Game:
             self.holdCardsToHandStack()
 
     def onSpace(self):
-        print("space")
+        # print("space")
         if self.is_game_over:
             return
 
@@ -743,7 +743,7 @@ class Game:
             self.holdCardsToHandStack()
 
     def onEscape(self):
-        print("escape")
+        # print("escape")
         if self.is_game_over:
             return
 
